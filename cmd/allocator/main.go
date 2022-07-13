@@ -18,11 +18,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -47,10 +45,8 @@ import (
 	"go.opencensus.io/plugin/ocgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
-	"gopkg.in/fsnotify.v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
@@ -59,11 +55,6 @@ import (
 )
 
 var logger = runtime.NewLoggerWithSource("main")
-
-const (
-	certDir = "/home/allocator/client-ca/"
-	tlsDir  = "/home/allocator/tls/"
-)
 
 const (
 	httpPortFlag                     = "http-port"
@@ -221,74 +212,6 @@ func main() {
 
 	h := newServiceHandler(kubeClient, agonesClient, health, conf.MTLSDisabled, conf.TLSDisabled, conf.remoteAllocationTimeout, conf.totalRemoteAllocationTimeout, conf.allocationBatchWaitTime)
 
-	if !h.tlsDisabled {
-		watcherTLS, err := fsnotify.NewWatcher()
-		if err != nil {
-			logger.WithError(err).Fatal("could not create watcher for tls certs")
-		}
-		defer watcherTLS.Close() // nolint: errcheck
-		if err := watcherTLS.Add(tlsDir); err != nil {
-			logger.WithError(err).Fatalf("cannot watch folder %s for secret changes", tlsDir)
-		}
-
-		// Watching for the events in certificate directory for updating certificates, when there is a change
-		go func() {
-			for {
-				select {
-				// watch for events
-				case event := <-watcherTLS.Events:
-					tlsCert, err := readTLSCert()
-					if err != nil {
-						logger.WithError(err).Error("could not load TLS cert; keeping old one")
-					} else {
-						h.tlsMutex.Lock()
-						h.tlsCert = tlsCert
-						h.tlsMutex.Unlock()
-					}
-					logger.Infof("Tls directory change event %v", event)
-
-				// watch for errors
-				case err := <-watcherTLS.Errors:
-					logger.WithError(err).Error("error watching for TLS directory")
-				}
-			}
-		}()
-
-		if !h.mTLSDisabled {
-			// creates a new file watcher for client certificate folder
-			watcher, err := fsnotify.NewWatcher()
-			if err != nil {
-				logger.WithError(err).Fatal("could not create watcher for client certs")
-			}
-			defer watcher.Close() // nolint: errcheck
-			if err := watcher.Add(certDir); err != nil {
-				logger.WithError(err).Fatalf("cannot watch folder %s for secret changes", certDir)
-			}
-
-			go func() {
-				for {
-					select {
-					// watch for events
-					case event := <-watcher.Events:
-						h.certMutex.Lock()
-						caCertPool, err := getCACertPool(certDir)
-						if err != nil {
-							logger.WithError(err).Error("could not load CA certs; keeping old ones")
-						} else {
-							h.caCertPool = caCertPool
-						}
-						logger.Infof("Certificate directory change event %v", event)
-						h.certMutex.Unlock()
-
-					// watch for errors
-					case err := <-watcher.Errors:
-						logger.WithError(err).Error("error watching for certificate directory")
-					}
-				}
-			}()
-		}
-	}
-
 	// If grpc and http use the same port then use a mux.
 	if conf.GRPCPort == conf.HTTPPort {
 		runMux(h, conf.HTTPPort)
@@ -336,29 +259,14 @@ func runREST(h *serviceHandler, httpPort int) {
 }
 
 func runHTTP(h *serviceHandler, httpPort int, handler http.Handler) {
-	cfg := &tls.Config{}
-	if !h.tlsDisabled {
-		cfg.GetCertificate = h.getTLSCert
-	}
-	if !h.mTLSDisabled {
-		cfg.ClientAuth = tls.RequireAnyClientCert
-		cfg.VerifyPeerCertificate = h.verifyClientCertificate
-	}
-
 	// Create a Server instance to listen on the http port with the TLS config.
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", httpPort),
-		TLSConfig: cfg,
-		Handler:   handler,
+		Addr:    fmt.Sprintf(":%d", httpPort),
+		Handler: handler,
 	}
 
 	go func() {
-		var err error
-		if !h.tlsDisabled {
-			err = server.ListenAndServeTLS("", "")
-		} else {
-			err = server.ListenAndServe()
-		}
+		err := server.ListenAndServe()
 
 		if err != nil {
 			logger.WithError(err).Fatal("Unable to start HTTP/HTTPS listener")
@@ -416,35 +324,7 @@ func newServiceHandler(kubeClient kubernetes.Interface, agonesClient versioned.I
 		logger.WithError(err).Fatal("starting allocator failed.")
 	}
 
-	if !h.tlsDisabled {
-		tlsCert, err := readTLSCert()
-		if err != nil {
-			logger.WithError(err).Fatal("could not load TLS certs.")
-		}
-		h.tlsMutex.Lock()
-		h.tlsCert = tlsCert
-		h.tlsMutex.Unlock()
-
-		if !h.mTLSDisabled {
-			caCertPool, err := getCACertPool(certDir)
-			if err != nil {
-				logger.WithError(err).Fatal("could not load CA certs.")
-			}
-			h.certMutex.Lock()
-			h.caCertPool = caCertPool
-			h.certMutex.Unlock()
-		}
-	}
-
 	return &h
-}
-
-func readTLSCert() (*tls.Certificate, error) {
-	tlsCert, err := tls.LoadX509KeyPair(tlsDir+"tls.crt", tlsDir+"tls.key")
-	if err != nil {
-		return nil, err
-	}
-	return &tlsCert, nil
 }
 
 // getMuxServerOptions returns a list of GRPC server option to use when
@@ -489,57 +369,7 @@ func (h *serviceHandler) getGRPCServerOptions() []grpc.ServerOption {
 		return opts
 	}
 
-	cfg := &tls.Config{
-		GetCertificate: h.getTLSCert,
-	}
-
-	if !h.mTLSDisabled {
-		cfg.ClientAuth = tls.RequireAnyClientCert
-		cfg.VerifyPeerCertificate = h.verifyClientCertificate
-	}
-
-	return append([]grpc.ServerOption{grpc.Creds(credentials.NewTLS(cfg))}, opts...)
-}
-
-func (h *serviceHandler) getTLSCert(ch *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	h.tlsMutex.RLock()
-	defer h.tlsMutex.RUnlock()
-	return h.tlsCert, nil
-}
-
-// verifyClientCertificate verifies that the client certificate is accepted
-// This method is used as GetConfigForClient is cross lang incompatible.
-func (h *serviceHandler) verifyClientCertificate(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-	opts := x509.VerifyOptions{
-		Roots:         h.caCertPool,
-		CurrentTime:   time.Now(),
-		Intermediates: x509.NewCertPool(),
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-
-	for _, rawCert := range rawCerts[1:] {
-		cert, err := x509.ParseCertificate(rawCert)
-		if err != nil {
-			logger.WithError(err).Warning("cannot parse intermediate certificate")
-			return errors.New("bad intermediate certificate: " + err.Error())
-		}
-		opts.Intermediates.AddCert(cert)
-	}
-
-	c, err := x509.ParseCertificate(rawCerts[0])
-	if err != nil {
-		logger.WithError(err).Warning("cannot parse client certificate")
-		return errors.New("bad client certificate: " + err.Error())
-	}
-
-	h.certMutex.RLock()
-	defer h.certMutex.RUnlock()
-	_, err = c.Verify(opts)
-	if err != nil {
-		logger.WithError(err).Warning("failed to verify client certificate")
-		return errors.New("failed to verify client certificate: " + err.Error())
-	}
-	return nil
+	return opts
 }
 
 // Set up our client which we will use to call the API
@@ -565,35 +395,6 @@ func getClients(ctlConfig config) (*kubernetes.Clientset, *versioned.Clientset, 
 		return nil, nil, errors.New("Could not create the agones api clientset")
 	}
 	return kubeClient, agonesClient, nil
-}
-
-func getCACertPool(path string) (*x509.CertPool, error) {
-	// Add all certificates under client-certs path because there could be multiple clusters
-	// and all client certs should be added.
-	caCertPool := x509.NewCertPool()
-	filesInfo, err := ioutil.ReadDir(path)
-	if err != nil {
-		return nil, fmt.Errorf("error reading certs from dir %s: %s", path, err.Error())
-	}
-
-	for _, file := range filesInfo {
-		if !strings.HasSuffix(file.Name(), ".crt") && !strings.HasSuffix(file.Name(), ".pem") {
-			continue
-		}
-		certFile := filepath.Join(path, file.Name())
-		caCert, err := ioutil.ReadFile(certFile)
-		if err != nil {
-			logger.Errorf("CA cert is not readable or missing: %s", err.Error())
-			continue
-		}
-		if !caCertPool.AppendCertsFromPEM(caCert) {
-			logger.Errorf("client cert %s cannot be installed", certFile)
-			continue
-		}
-		logger.Infof("client cert %s is installed", certFile)
-	}
-
-	return caCertPool, nil
 }
 
 type serviceHandler struct {

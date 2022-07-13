@@ -15,12 +15,9 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/pem"
-	"io/ioutil"
+	//"crypto/tls"
+
 	"net/http"
-	"os"
 	"testing"
 
 	pb "agones.dev/agones/pkg/allocation/go"
@@ -84,27 +81,27 @@ func TestAllocateHandlerReturnsError(t *testing.T) {
 	}
 }
 
-func TestGetTlsCert(t *testing.T) {
-	t.Parallel()
-	cert1, err := tls.X509KeyPair(serverCert1, serverKey1)
-	assert.Nil(t, err, "expected (serverCert1, serverKey1) to create a cert")
+// func TestGetTlsCert(t *testing.T) {
+// 	t.Parallel()
+// 	cert1, err := tls.X509KeyPair(serverCert1, serverKey1)
+// 	assert.Nil(t, err, "expected (serverCert1, serverKey1) to create a cert")
 
-	cert2, err := tls.X509KeyPair(serverCert2, serverKey2)
-	assert.Nil(t, err, "expected (serverCert2, serverKey2) to create a cert")
+// 	cert2, err := tls.X509KeyPair(serverCert2, serverKey2)
+// 	assert.Nil(t, err, "expected (serverCert2, serverKey2) to create a cert")
 
-	h := serviceHandler{
-		tlsCert: &cert1,
-	}
+// 	h := serviceHandler{
+// 		tlsCert: &cert1,
+// 	}
 
-	retrievedCert1, err := h.getTLSCert(nil)
-	assert.Nil(t, err, "expected getTlsCert() to not fail")
-	assert.Equal(t, cert1.Certificate, retrievedCert1.Certificate, "expected the retrieved cert to be equal to the original one")
+// 	retrievedCert1, err := h.getTLSCert(nil)
+// 	assert.Nil(t, err, "expected getTlsCert() to not fail")
+// 	assert.Equal(t, cert1.Certificate, retrievedCert1.Certificate, "expected the retrieved cert to be equal to the original one")
 
-	h.tlsCert = &cert2
-	retrievedCert2, err := h.getTLSCert(nil)
-	assert.Nil(t, err, "expected getTlsCert() to not fail")
-	assert.Equal(t, cert2.Certificate, retrievedCert2.Certificate, "expected the retrieved cert to be equal to the original one")
-}
+// 	h.tlsCert = &cert2
+// 	retrievedCert2, err := h.getTLSCert(nil)
+// 	assert.Nil(t, err, "expected getTlsCert() to not fail")
+// 	assert.Equal(t, cert2.Certificate, retrievedCert2.Certificate, "expected the retrieved cert to be equal to the original one")
+// }
 
 func TestHandlingStatus(t *testing.T) {
 	t.Parallel()
@@ -162,53 +159,53 @@ func TestBadReturnType(t *testing.T) {
 	assert.Contains(t, st.Message(), "internal server error")
 }
 
-func TestVerifyClientCertificateSucceeds(t *testing.T) {
-	t.Parallel()
+// func TestVerifyClientCertificateSucceeds(t *testing.T) {
+// 	t.Parallel()
 
-	crt := []byte(clientCert)
-	certPool := x509.NewCertPool()
-	assert.True(t, certPool.AppendCertsFromPEM(crt))
+// 	crt := []byte(clientCert)
+// 	certPool := x509.NewCertPool()
+// 	assert.True(t, certPool.AppendCertsFromPEM(crt))
 
-	h := serviceHandler{
-		caCertPool: certPool,
-	}
+// 	h := serviceHandler{
+// 		caCertPool: certPool,
+// 	}
 
-	block, _ := pem.Decode(crt)
-	input := [][]byte{block.Bytes}
-	assert.Nil(t, h.verifyClientCertificate(input, nil),
-		"verifyClientCertificate failed.")
-}
+// 	block, _ := pem.Decode(crt)
+// 	input := [][]byte{block.Bytes}
+// 	assert.Nil(t, h.verifyClientCertificate(input, nil),
+// 		"verifyClientCertificate failed.")
+// }
 
-func TestVerifyClientCertificateFails(t *testing.T) {
-	t.Parallel()
+// func TestVerifyClientCertificateFails(t *testing.T) {
+// 	t.Parallel()
 
-	crt := []byte(clientCert)
-	certPool := x509.NewCertPool()
-	h := serviceHandler{
-		caCertPool: certPool,
-	}
+// 	crt := []byte(clientCert)
+// 	certPool := x509.NewCertPool()
+// 	h := serviceHandler{
+// 		caCertPool: certPool,
+// 	}
 
-	block, _ := pem.Decode(crt)
-	input := [][]byte{block.Bytes}
-	assert.Error(t, h.verifyClientCertificate(input, nil),
-		"verifyClientCertificate() succeeded, expected error.")
-}
+// 	block, _ := pem.Decode(crt)
+// 	input := [][]byte{block.Bytes}
+// 	assert.Error(t, h.verifyClientCertificate(input, nil),
+// 		"verifyClientCertificate() succeeded, expected error.")
+// }
 
-func TestGettingCaCert(t *testing.T) {
-	t.Parallel()
+// func TestGettingCaCert(t *testing.T) {
+// 	t.Parallel()
 
-	file, err := ioutil.TempFile(".", "*.crt")
-	if assert.Nil(t, err) {
-		defer os.Remove(file.Name()) // nolint: errcheck
-		_, err = file.WriteString(clientCert)
-		if assert.Nil(t, err) {
-			certPool, err := getCACertPool("./")
-			if assert.Nil(t, err) {
-				assert.Len(t, certPool.Subjects(), 1)
-			}
-		}
-	}
-}
+// 	file, err := ioutil.TempFile(".", "*.crt")
+// 	if assert.Nil(t, err) {
+// 		defer os.Remove(file.Name()) // nolint: errcheck
+// 		_, err = file.WriteString(clientCert)
+// 		if assert.Nil(t, err) {
+// 			certPool, err := getCACertPool("./")
+// 			if assert.Nil(t, err) {
+// 				assert.Len(t, certPool.Subjects(), 1)
+// 			}
+// 		}
+// 	}
+// }
 
 var clientCert = `-----BEGIN CERTIFICATE-----
 MIIDuzCCAqOgAwIBAgIUduDWtqpUsp3rZhCEfUrzI05laVIwDQYJKoZIhvcNAQEL
