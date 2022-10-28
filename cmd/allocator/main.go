@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -117,7 +118,10 @@ func parseEnvFlags() config {
 	runtime.Must(viper.BindEnv(stackdriverLabels))
 	runtime.Must(viper.BindEnv(mTLSDisabledFlag))
 	runtime.Must(viper.BindEnv(tlsDisabledFlag))
+	runtime.Must(viper.BindEnv(remoteAllocationTimeoutFlag))
+	runtime.Must(viper.BindEnv(totalRemoteAllocationTimeoutFlag))
 	runtime.Must(viper.BindEnv(logLevelFlag))
+	runtime.Must(viper.BindEnv(allocationBatchWaitTime))
 	runtime.Must(viper.BindPFlags(pflag.CommandLine))
 	runtime.Must(runtime.FeaturesBindEnv())
 
@@ -395,6 +399,35 @@ func getClients(ctlConfig config) (*kubernetes.Clientset, *versioned.Clientset, 
 		return nil, nil, errors.New("Could not create the agones api clientset")
 	}
 	return kubeClient, agonesClient, nil
+}
+
+func getCACertPool(path string) (*x509.CertPool, error) {
+	// Add all certificates under client-certs path because there could be multiple clusters
+	// and all client certs should be added.
+	caCertPool := x509.NewCertPool()
+	dirEntries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, fmt.Errorf("error reading certs from dir %s: %s", path, err.Error())
+	}
+
+	for _, dirEntry := range dirEntries {
+		if !strings.HasSuffix(dirEntry.Name(), ".crt") && !strings.HasSuffix(dirEntry.Name(), ".pem") {
+			continue
+		}
+		certFile := filepath.Join(path, dirEntry.Name())
+		caCert, err := os.ReadFile(certFile)
+		if err != nil {
+			logger.Errorf("CA cert is not readable or missing: %s", err.Error())
+			continue
+		}
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			logger.Errorf("client cert %s cannot be installed", certFile)
+			continue
+		}
+		logger.Infof("client cert %s is installed", certFile)
+	}
+
+	return caCertPool, nil
 }
 
 type serviceHandler struct {

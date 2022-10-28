@@ -23,7 +23,7 @@ RUN apt-get update && \
 
 # install go
 WORKDIR /usr/local
-ENV GO_VERSION=1.17.2
+ENV GO_VERSION=1.19.1
 ENV GOPATH /go
 ENV GO111MODULE=on
 RUN wget -q https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz && \
@@ -44,7 +44,7 @@ ENV PATH /usr/local/go/bin:/go/bin:$PATH
 RUN go install golang.org/x/tools/cmd/goimports@latest
 
 # the kubernetes version for the file
-ENV KUBERNETES_VER 1.22.9
+ENV KUBERNETES_VER 1.23.9
 
 # overwrite kubectl as we want a specific version
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/v${KUBERNETES_VER}/bin/linux/amd64/kubectl && \
@@ -67,7 +67,7 @@ RUN curl -L  ${HELM_URL} > /tmp/helm.tar.gz \
 RUN echo "source <(helm completion bash)" >> /root/.bashrc
 
 # install golang-ci linter
-RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.43.0
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49.0
 
 #
 #  \ \      / /__| |__  ___(_) |_ ___

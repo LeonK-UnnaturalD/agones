@@ -1086,7 +1086,7 @@ func TestScaleUpAndDownInParallelStressTest(t *testing.T) {
 
 		flt, err := client.Fleets(framework.Namespace).Create(ctx, flt, metav1.CreateOptions{})
 		if assert.Nil(t, err) {
-			defer client.Fleets(framework.Namespace).Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
+			defer client.Fleets(framework.Namespace).Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint
 		}
 		fleets = append(fleets, flt)
 	}
@@ -1631,7 +1631,7 @@ func defaultFleet(namespace string) *agonesv1.Fleet {
 // fleetWithGameServerSpec returns a fleet with specified gameserver spec
 func fleetWithGameServerSpec(gsSpec *agonesv1.GameServerSpec, namespace string) *agonesv1.Fleet {
 	return &agonesv1.Fleet{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "simple-fleet-", Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{GenerateName: "simple-fleet-1.0", Namespace: namespace},
 		Spec: agonesv1.FleetSpec{
 			Replicas: replicasCount,
 			Template: agonesv1.GameServerTemplateSpec{

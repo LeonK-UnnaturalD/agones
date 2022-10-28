@@ -624,7 +624,7 @@ func (c *Controller) sidecar(gs *agonesv1.GameServer) corev1.Container {
 		},
 		Resources: corev1.ResourceRequirements{},
 		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/healthz",
 					Port: intstr.FromInt(8080),
@@ -676,7 +676,7 @@ func (c *Controller) addGameServerHealthCheck(gs *agonesv1.GameServer, pod *core
 	return gs.ApplyToPodContainer(pod, gs.Spec.Container, func(c corev1.Container) corev1.Container {
 		if c.LivenessProbe == nil {
 			c.LivenessProbe = &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/gshealthz",
 						Port: intstr.FromInt(8080),
@@ -830,7 +830,7 @@ func (c *Controller) syncGameServerRequestReadyState(ctx context.Context, gs *ag
 				// check to make sure this container is actually running. If there was a recent crash, the cache may
 				// not yet have the newer, running container.
 				if cs.State.Running == nil {
-					return nil, fmt.Errorf("game server container for GameServer %s in namespace %s is not currently running, try again", gsCopy.ObjectMeta.Name, gsCopy.ObjectMeta.Namespace)
+					return nil, workerqueue.NewDebugError(fmt.Errorf("game server container for GameServer %s in namespace %s is not currently running, try again", gsCopy.ObjectMeta.Name, gsCopy.ObjectMeta.Namespace))
 				}
 				gsCopy.ObjectMeta.Annotations[agonesv1.GameServerReadyContainerIDAnnotation] = cs.ContainerID
 			}

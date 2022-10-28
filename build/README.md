@@ -13,7 +13,7 @@ Table of Contents
   * [Building on Different Platforms](#building-on-different-platforms)
      * [Linux](#linux)
      * [Windows](#windows)
-     * [macOS](#macos)  
+     * [macOS](#macos)
   * [Testing and Building](#testing-and-building)
      * [Running a Test Google Kubernetes Engine Cluster](#running-a-test-google-kubernetes-engine-cluster)
      * [Running a Test Minikube cluster](#running-a-test-minikube-cluster)
@@ -38,6 +38,7 @@ Table of Contents
         * [make build-images](#make-build-images)
         * [make build-sdks](#make-build-sdks)
         * [make build-sdk](#make-build-sdk)
+        * [make run-sdk-command](#make-run-sdk-command)
         * [make run-sdk-conformance-tests](#make-run-sdk-conformance-tests)
         * [make clean-sdk-conformance-tests](#make-clean-sdk-conformance-tests)
         * [make test](#make-test)
@@ -64,6 +65,7 @@ Table of Contents
         * [make gen-install](#make-gen-install)
         * [make gen-embedded-openapi](#make-gen-embedded-openapi)
         * [make gen-crd-client](#make-gen-crd-client)
+        * [make gen-all-sdk-grpc](#make-gen-all-sdk-grpc)
         * [make gen-sdk-grpc](#make-gen-sdk-grpc)
      * [Build Image Targets](#build-image-targets)
         * [make clean-config](#make-clean-config)
@@ -194,14 +196,15 @@ variables, or by setting them within your
 
 See the table below for available customizations :
 
-| Parameter                                      | Description                                                                   | Default         |
-|------------------------------------------------|-------------------------------------------------------------------------------|-----------------|
-| `GCP_CLUSTER_NAME`                             | The name of the cluster                                                       | `test-cluster`  |
-| `GCP_CLUSTER_ZONE`                             | The name of the Google Compute Engine zone in which the cluster will resides. | `us-west1-c`    |
-| `GCP_CLUSTER_NODEPOOL_INITIALNODECOUNT`        | The number of nodes to create in this cluster.                                | `4`             |
-| `GCP_CLUSTER_NODEPOOL_MACHINETYPE`             | The name of a Google Compute Engine machine type.                             | `e2-standard-4` |
-| `GCP_CLUSTER_NODEPOOL_WINDOWSINITIALNODECOUNT` | The number of Windows nodes to create in this cluster.                        | `0`             |
-| `GCP_CLUSTER_NODEPOOL_WINDOWSMACHINETYPE`      | The name of a Google Compute Engine machine type for Windows nodes.           | `e2-standard-4` |
+| Parameter                                      | Description                                                                           | Default         |
+|------------------------------------------------|---------------------------------------------------------------------------------------|-----------------|
+| `GCP_CLUSTER_NAME`                             | The name of the cluster                                                               | `test-cluster`  |
+| `GCP_CLUSTER_ZONE`                             | The name of the Google Compute Engine zone in which the cluster will resides.         | `us-west1-c`    |
+| `GCP_CLUSTER_NODEPOOL_INITIALNODECOUNT`        | The number of nodes to create in this cluster.                                        | `4`             |
+| `GCP_CLUSTER_NODEPOOL_MACHINETYPE`             | The name of a Google Compute Engine machine type.                                     | `e2-standard-4` |
+| `GCP_CLUSTER_NODEPOOL_ENABLEIMAGESTREAMING`    | Whether or not to enable image streaming for the `"default"` node pool in the cluster | `true`          |
+| `GCP_CLUSTER_NODEPOOL_WINDOWSINITIALNODECOUNT` | The number of Windows nodes to create in this cluster.                                | `0`             |
+| `GCP_CLUSTER_NODEPOOL_WINDOWSMACHINETYPE`      | The name of a Google Compute Engine machine type for Windows nodes.                   | `e2-standard-4` |
 
 This will take several minutes to complete, but once done you can go to the Google Cloud Platform console and see that
 a cluster is up and running!
@@ -478,6 +481,10 @@ Build all the sdks required for Agones
 Next command `make build-sdk SDK_FOLDER=[SDK_TYPE]` will build SDK of `SDK_TYPE`.
 For instance, in order to build the cpp sdk static and dynamic libraries (linux libraries only) use `SDK_FOLDER=cpp`
 
+#### `make run-sdk-command`
+Next command `make run-sdk-command COMMAND=[COMMAND] SDK_FOLDER=[SDK_TYPE]` will execute command for `SDK_TYPE`.
+For instance, in order to generate swagger codes when you change swagger.json definition, use `make run-sdk-command COMMAND=gen SDK_FOLDER=restapi`
+
 #### `make run-sdk-conformance-local`
 Run Agones sidecar which would wait for all requests from the SDK client.
 Note that annotation should contain UID and label should contain CreationTimestamp values to pass the test.
@@ -654,8 +661,11 @@ This should be run against a clean or brand new cluster, as external CRD's or sc
 #### `make gen-crd-client`
 Generate the Custom Resource Definition client(s)
 
+#### `make gen-all-sdk-grpc`
+Generate the SDK gRPC server and client code for all SDKs.
+
 #### `make gen-sdk-grpc`
-Generate the SDK gRPC server and client code
+Generate the SDK gRPC server and client code for a single SDK (specified in the `SDK_FOLDER` variable).
 
 ### Build Image Targets
 
