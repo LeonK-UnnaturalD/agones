@@ -1,4 +1,6 @@
-# Copyright 2020 Google LLC All Rights Reserved.
+#!/usr/bin/env bash
+
+# Copyright 2022 Google LLC All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apiVersion: "allocation.agones.dev/v1"
-kind: GameServerAllocation
-spec:
-  selectors:
-    - matchLabels:
-        agones.dev/fleet: supertuxkart
+set -ex
+cd ./sdks/cpp
+bash
